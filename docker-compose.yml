@@ -1,0 +1,9 @@
+services:
+  karpaty-bot:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - ${WIKI_ROOT_HOST:-/home/vlad/mozg}:/wiki
+    environment:
+      WIKI_ROOT: /wiki
