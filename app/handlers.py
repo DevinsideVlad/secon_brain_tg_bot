@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from enum import StrEnum
@@ -40,6 +41,9 @@ class Mode(StrEnum):
 # In-memory режимы (Раздел 14 ТЗ). После перезапуска по умолчанию — capture.
 _client_modes: dict[int, Mode] = {}
 
+# Защита от одновременной записи в Wiki (Раздел 41).
+_wiki_lock = asyncio.Lock()
+
 
 def set_mode(chat_id: int, mode: Mode) -> None:
     _client_modes[chat_id] = mode
@@ -61,6 +65,27 @@ BUTTON_TO_MODE = {
 
 
 async def perform_capture(
+    root: Path,
+    text: str,
+    *,
+    kind: str = "user_thought",
+    message_id: int | None = None,
+    llm: LLMService | None = None,
+    when: datetime | None = None,
+) -> dict:
+    """Пайплайн Capture (Разделы 20-27, 38) под защитой wiki_lock (Раздел 41)."""
+    async with _wiki_lock:
+        return await _perform_capture(
+            root,
+            text,
+            kind=kind,
+            message_id=message_id,
+            llm=llm,
+            when=when,
+        )
+
+
+async def _perform_capture(
     root: Path,
     text: str,
     *,
@@ -216,7 +241,17 @@ async def cmd_ask(message: Message) -> None:
 
 
 async def perform_ask(root: Path, question: str, llm: LLMService | None = None) -> dict:
+    """Режим /ask (Раздел 13) под защитой wiki_lock. Wiki не изменяется."""
+    async with _wiki_lock:
+        return await _perform_ask(root, question, llm=llm)
+
+
+async def _perform_ask(
+    root: Path, question: str, llm: LLMService | None = None
+) -> dict:
     """Режим /ask (Раздел 13). Wiki не изменяется."""
+    if settings.git_enabled:
+        git.pull(root)
     llm = llm or LLMService()
     agents = wiki.read_agents(root)
     analysis = await llm.analyze_topic(agents, question, wiki.list_wiki_pages(root))
