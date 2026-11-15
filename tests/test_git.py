@@ -54,8 +54,55 @@ def test_pull_integration(git_env):
     _run(Path(other), "commit", "-m", "other change")
     _run(Path(other), "push")
 
-    git.pull(git_env["work"])
+    with patch("app.git.settings.git_remote", "origin"), patch(
+        "app.git.settings.git_branch", "master"
+    ):
+        git.pull(git_env["work"])
     assert (git_env["work"] / "from-other.md").is_file()
+
+
+def test_pull_uses_explicit_branch_and_autostash(tmp_path):
+    with patch("app.git._run") as run, patch(
+        "app.git.settings.git_remote", "origin"
+    ), patch("app.git.settings.git_branch", "main"):
+        git.pull(tmp_path)
+    run.assert_called_once_with(
+        tmp_path, "pull", "--rebase", "--autostash", "origin", "main"
+    )
+
+
+def test_pull_keeps_dirty_changes_with_autostash(git_env):
+    base = git_env["work"].parent
+    other = base / "other-dirty"
+
+    def git_other(*args: str):
+        return subprocess.run(
+            ["git", *args], cwd=other, capture_output=True, text=True
+        )
+
+    assert subprocess.run(
+        ["git", "clone", str(git_env["origin"]), str(other)],
+        cwd=base,
+        capture_output=True,
+        text=True,
+    ).returncode == 0
+    git_other("config", "user.email", "bot@test.local")
+    git_other("config", "user.name", "Test Bot")
+    (other / "remote.md").write_text("remote", encoding="utf-8")
+    git_other("add", "--", "remote.md")
+    git_other("commit", "-m", "remote change")
+    git_other("push")
+
+    work = git_env["work"]
+    (work / "base.md").write_text("# base\nlocal dirty\n", encoding="utf-8")
+
+    with patch("app.git.settings.git_remote", "origin"), patch(
+        "app.git.settings.git_branch", "master"
+    ):
+        git.pull(work)
+
+    assert (work / "remote.md").is_file()
+    assert "local dirty" in (work / "base.md").read_text(encoding="utf-8")
 
 
 def test_commit_only_specified_files(git_env):

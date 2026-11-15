@@ -8,6 +8,8 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from .schemas import normalize_page_type
+
 PAGE_TYPE_DIRS: dict[str, str] = {
     "concept": "concepts",
     "decision": "decisions",
@@ -15,9 +17,38 @@ PAGE_TYPE_DIRS: dict[str, str] = {
     "idea": "ideas",
     "source": "sources",
     "synthesis": "synthesis",
+    "hypothesis": "hypotheses",
+    "comparison": "comparisons",
+    "entity": "entities",
 }
 
-SEO = {"idea", "decision", "gap", "concept", "source", "synthesis"}
+_PAGE_TYPE_ALIASES: dict[str, str] = {
+    "concepts": "concept",
+    "decisions": "decision",
+    "gaps": "gap",
+    "ideas": "idea",
+    "sources": "source",
+    "syntheses": "synthesis",
+    "hypotheses": "hypothesis",
+    "comparisons": "comparison",
+    "entities": "entity",
+}
+
+
+def canonical_page_type(page_type: str) -> str:
+    """Приводит тип к единственному числу для известных типов."""
+    key = normalize_page_type(page_type)
+    return _PAGE_TYPE_ALIASES.get(key, key)
+
+
+def page_type_dir(page_type: str) -> str:
+    """Каталог для типа страницы.
+
+    Известные типы получают канонический каталог, неизвестный тип —
+    каталог, названный по самому типу.
+    """
+    key = canonical_page_type(page_type)
+    return PAGE_TYPE_DIRS.get(key, key)
 
 
 class WikiError(Exception):
@@ -80,10 +111,35 @@ def read_agents(wiki_root: Path) -> str:
 
 
 def read_template(wiki_root: Path, template_name: str) -> str:
-    path = wiki_root / "templates" / f"{template_name}.md"
+    name = canonical_page_type(template_name)
+    path = wiki_root / "templates" / f"{name}.md"
     if not path.is_file():
         raise TemplateNotFoundError(f"template не найден: {path}")
     return path.read_text(encoding="utf-8")
+
+
+def templates_for_types(wiki_root: Path, page_types: list[str]) -> dict[str, str]:
+    """Читает существующие templates для типов, отсутствующие пропускает.
+
+    AGENTS.md не гарантирует template для каждого типа, поэтому отсутствие
+    шаблона не должно ломать обработку сообщения.
+    """
+    templates: dict[str, str] = {}
+    for page_type in page_types:
+        name = canonical_page_type(page_type)
+        if name in templates:
+            continue
+        path = wiki_root / "templates" / f"{name}.md"
+        if path.is_file():
+            templates[name] = path.read_text(encoding="utf-8")
+    return templates
+
+
+def list_template_names(wiki_root: Path) -> list[str]:
+    templates_dir = wiki_root / "templates"
+    if not templates_dir.is_dir():
+        return []
+    return sorted(path.stem for path in templates_dir.glob("*.md"))
 
 
 def list_wiki_pages(wiki_root: Path) -> list[str]:
@@ -131,11 +187,10 @@ def _slugify(title: str) -> str:
 def page_rel_path(page_type: str, area: str, title: str) -> str:
     """Вычисляет относительный путь страницы внутри wiki/ (Раздел 23).
 
-    Путь определяет Python, а не LLM.
+    Путь определяет Python, а не LLM. Неизвестный тип получает каталог,
+    названный по самому типу.
     """
-    if page_type not in PAGE_TYPE_DIRS:
-        raise WikiError(f"неизвестный тип страницы: {page_type}")
-    subdir = PAGE_TYPE_DIRS[page_type]
+    subdir = page_type_dir(page_type)
     return (Path("areas") / area / subdir / f"{_slugify(title)}.md").as_posix()
 
 

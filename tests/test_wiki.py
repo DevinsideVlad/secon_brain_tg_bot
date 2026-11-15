@@ -11,15 +11,20 @@ from app.wiki import (
     WikiError,
     WikiStructureError,
     append_log,
+    canonical_page_type,
     check_structure,
     create_page,
+    list_template_names,
     list_wiki_pages,
+    page_rel_path,
+    page_type_dir,
     read_agents,
     read_template,
     read_wiki_page,
     recent_log,
     save_raw_message,
     search_wiki,
+    templates_for_types,
     update_page,
 )
 
@@ -91,9 +96,43 @@ def test_create_page_existing_raises(tmp_wiki):
         create_page(tmp_wiki, "idea", "business", "Идея", "text")
 
 
-def test_create_page_unknown_type(tmp_wiki):
-    with pytest.raises(WikiError):
-        create_page(tmp_wiki, "comparison", "business", "x", "y")
+def test_create_page_known_new_type(tmp_wiki):
+    rel = create_page(tmp_wiki, "hypothesis", "business", "Рынок", "# Рынок\n")
+    assert rel == "areas/business/hypotheses/рынок.md"
+    assert (tmp_wiki / "wiki" / rel).is_file()
+
+
+def test_create_page_unknown_type_uses_type_dir(tmp_wiki):
+    rel = create_page(tmp_wiki, "Market Map", "business", "Карта рынка", "# Карта\n")
+    assert rel == "areas/business/market-map/карта-рынка.md"
+    assert (tmp_wiki / "wiki" / rel).is_file()
+
+
+def test_page_type_dir_and_canonical():
+    assert canonical_page_type("Comparisons") == "comparison"
+    assert canonical_page_type("hypotheses") == "hypothesis"
+    assert page_type_dir("hypothesis") == "hypotheses"
+    assert page_type_dir("hypotheses") == "hypotheses"
+    assert page_type_dir("entity") == "entities"
+    assert page_type_dir("framework") == "framework"
+
+
+def test_page_rel_path_unknown_type():
+    assert (
+        page_rel_path("Framework", "personal", "Мой подход")
+        == "areas/personal/framework/мой-подход.md"
+    )
+
+
+def test_templates_for_types_skips_missing(tmp_wiki):
+    templates = templates_for_types(tmp_wiki, ["idea", "hypothesis", "idea"])
+    assert set(templates) == {"idea"}
+
+
+def test_list_template_names(tmp_wiki):
+    names = list_template_names(tmp_wiki)
+    assert "idea" in names
+    assert "comparison" not in names
 
 
 def test_read_wiki_page_and_not_found(tmp_wiki):

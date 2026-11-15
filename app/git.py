@@ -37,7 +37,14 @@ def is_repo(root: Path) -> bool:
 
 
 def pull(root: Path) -> str:
-    return _run(root, "pull", "--rebase")
+    return _run(
+        root,
+        "pull",
+        "--rebase",
+        "--autostash",
+        settings.git_remote,
+        settings.git_branch,
+    )
 
 
 def commit(root: Path, files: list[str], message: str) -> str:

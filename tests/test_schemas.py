@@ -3,7 +3,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from app.schemas import WikiAction, WikiPlan
+from app.schemas import TopicAnalysis, WikiAction, WikiPlan
 
 
 def test_wiki_action_create_valid():
@@ -34,14 +34,39 @@ def test_wiki_action_none_needs_nothing():
     assert action.title == ""
 
 
-def test_wiki_action_invalid_page_type():
-    with pytest.raises(ValidationError):
-        WikiAction(
-            action="create",
-            page_type="comparison",
-            title="x",
-            content="y",
-        )
+def test_wiki_action_accepts_open_page_type():
+    action = WikiAction(
+        action="create",
+        page_type="comparison",
+        title="x",
+        content="y",
+    )
+    assert action.page_type == "comparison"
+
+
+def test_wiki_action_normalizes_page_type():
+    action = WikiAction(
+        action="create",
+        page_type="  Case Study ",
+        title="x",
+        content="y",
+    )
+    assert action.page_type == "case-study"
+
+
+def test_wiki_action_empty_page_type_defaults_to_idea():
+    action = WikiAction(action="none", page_type="   ")
+    assert action.page_type == "idea"
+
+
+def test_topic_analysis_accepts_unknown_page_type():
+    analysis = TopicAnalysis(
+        topic="t",
+        likely_page_type="Hypothesis",
+        possible_types=["Comparison", "market-map"],
+    )
+    assert analysis.likely_page_type == "hypothesis"
+    assert analysis.possible_types == ["comparison", "market-map"]
 
 
 def test_wiki_plan_parses_from_json():

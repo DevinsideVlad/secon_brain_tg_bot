@@ -115,7 +115,7 @@ async def _perform_capture(
     types = list(analysis.possible_types) or [analysis.likely_page_type]
     if analysis.likely_page_type not in types:
         types.append(analysis.likely_page_type)
-    templates = {name: wiki.read_template(root, name) for name in types}
+    templates = wiki.templates_for_types(root, types)
 
     plan = await llm.build_wiki_plan(agents, text, related_pages, templates)
 
@@ -282,12 +282,8 @@ def _status_lines() -> list[str]:
         lines.append(f"✅ AGENTS.md читается ({len(agents)} симв.)")
     except wiki.WikiError as exc:
         lines.append(f"❌ AGENTS.md: {exc}")
-    templates = [
-        p.stem
-        for p in (root / "templates").glob("*.md")
-        if p.stem in wiki.PAGE_TYPE_DIRS
-    ]
-    lines.append(f"✅ templates: {esc(', '.join(sorted(templates)) or '(нет)')}")
+    templates = wiki.list_template_names(root)
+    lines.append(f"✅ templates: {esc(', '.join(templates) or '(нет)')}")
     sources = root / "raw" / "sources"
     raw_count = len(list(sources.glob("*.md"))) if sources.is_dir() else 0
     lines.append(f"✅ raw/sources: {raw_count} файлов")

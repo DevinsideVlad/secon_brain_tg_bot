@@ -76,8 +76,10 @@ class LLMService:
             + agents
             + "\n\nОпредели тему сообщения, связанные понятия и search_terms "
             "(2-6 коротких терминов для локального поиска по Wiki), "
-            "likely_page_type и possible_types (1-3 вероятных типа создаваемых страниц "
-            "из набора concept|decision|gap|idea|source|synthesis). "
+            "likely_page_type и possible_types (1-3 вероятных типа создаваемых страниц). "
+            "Тип — короткое имя по смыслу, например concept, decision, gap, idea, "
+            "source, synthesis, hypothesis, comparison, entity. "
+            "Список типов не исчерпывающий: если ни один не подходит, придумай новый. "
             'Верни JSON {"topic": ..., "search_terms": [...], '
             '"related_concepts": [...], "likely_page_type": ..., "possible_types": [...]}.'
         )
@@ -112,7 +114,9 @@ class LLMService:
             "(Раздел 26). Не превращай мнение пользователя в утверждённый факт. "
             "Если страница уже отражает сообщение полностью — action=none. "
             'Верни JSON {"summary": "...", "actions": [{"action": "create|update|none", '
-            '"page_type": "concept|decision|gap|idea|source|synthesis", '
+            '"page_type": "<короткое имя типа по смыслу, например concept, decision, '
+            'gap, idea, source, synthesis, hypothesis, comparison, entity; '
+            'список не исчерпывающий>", '
             '"area": "business|personal", "existing_path": "...|null", "title": "...", '
             '"content": "полный markdown", "related_paths": [...]}]}. '
             "Ответ в JSON вложенного объекта — summary, actions. "
